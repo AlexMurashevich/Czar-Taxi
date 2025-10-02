@@ -23,11 +23,63 @@ export default function Reports() {
   const { data: activeSeason } = useActiveSeason();
   const { toast } = useToast();
 
+  const handleExportSeasonSummary = async () => {
+    if (!activeSeason) {
+      toast({
+        title: "Ошибка",
+        description: "Нет активного сезона",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    setGeneratingReports(prev => new Set([...prev, 'Итоги сезона']));
+    
+    try {
+      const response = await fetch(`/api/export/season/${activeSeason.id}`, {
+        credentials: 'include'
+      });
+      if (!response.ok) throw new Error('Export failed');
+      
+      const blob = await response.blob();
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `season_${activeSeason.name}_summary.xlsx`;
+      document.body.appendChild(a);
+      a.click();
+      window.URL.revokeObjectURL(url);
+      document.body.removeChild(a);
+      
+      toast({
+        title: "Отчёт скачан",
+        description: "Итоги сезона успешно экспортированы",
+      });
+    } catch (error) {
+      toast({
+        title: "Ошибка",
+        description: "Не удалось экспортировать отчёт",
+        variant: "destructive",
+      });
+    } finally {
+      setGeneratingReports(prev => {
+        const newSet = new Set(prev);
+        newSet.delete('Итоги сезона');
+        return newSet;
+      });
+    }
+  };
+
   const handleGenerateReport = async (reportType: string) => {
+    if (reportType === 'Итоги сезона') {
+      await handleExportSeasonSummary();
+      return;
+    }
+
     setGeneratingReports(prev => new Set([...prev, reportType]));
     
     try {
-      // Simulate API call
+      // Simulate API call for other reports
       await new Promise(resolve => setTimeout(resolve, 2000));
       
       toast({

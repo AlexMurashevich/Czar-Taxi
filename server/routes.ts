@@ -9,26 +9,98 @@ import { roleTransitions } from "./services/role-transitions";
 import { antiFraud } from "./services/anti-fraud";
 import { telegramBot } from "./services/telegram-bot";
 import { analyticsService } from "./services/analytics";
+import { exportService } from "./services/export";
 import { setupWebSocket } from "./websocket";
 import multer from "multer";
 
 const upload = multer({ dest: 'uploads/' });
 
-// Admin authentication middleware
+// Admin authentication middleware (session-based)
 const adminAuth = (req: any, res: any, next: any) => {
   // In development without ADMIN_KEY, allow all requests
   if (!process.env.ADMIN_KEY) {
     return next();
   }
   
-  const adminKey = req.headers['x-admin-key'];
-  if (!adminKey || adminKey !== process.env.ADMIN_KEY) {
-    return res.status(401).json({ error: 'Unauthorized' });
+  // Check if admin is authenticated via session
+  if (req.session?.isAdmin) {
+    return next();
   }
-  next();
+  
+  return res.status(401).json({ error: 'Unauthorized' });
 };
 
 export async function registerRoutes(app: Express): Promise<Server> {
+  // Admin authentication
+  app.post("/api/auth/login", async (req, res) => {
+    try {
+      const { adminKey } = req.body || {};
+      
+      if (!process.env.ADMIN_KEY) {
+        // In development without ADMIN_KEY, auto-login
+        req.session.regenerate((err) => {
+          if (err) {
+            console.error('Session regenerate error:', err);
+            return res.status(500).json({ error: "Login failed" });
+          }
+          req.session.isAdmin = true;
+          req.session.save((err) => {
+            if (err) {
+              console.error('Session save error:', err);
+              return res.status(500).json({ error: "Login failed" });
+            }
+            res.json({ success: true });
+          });
+        });
+        return;
+      }
+      
+      if (!adminKey) {
+        return res.status(400).json({ error: 'Admin key required' });
+      }
+      
+      if (adminKey === process.env.ADMIN_KEY) {
+        req.session.regenerate((err) => {
+          if (err) {
+            console.error('Session regenerate error:', err);
+            return res.status(500).json({ error: "Login failed" });
+          }
+          req.session.isAdmin = true;
+          req.session.save((err) => {
+            if (err) {
+              console.error('Session save error:', err);
+              return res.status(500).json({ error: "Login failed" });
+            }
+            res.json({ success: true });
+          });
+        });
+        return;
+      }
+      
+      return res.status(401).json({ error: 'Invalid admin key' });
+    } catch (error) {
+      console.error('Login error:', error);
+      res.status(500).json({ error: "Login failed" });
+    }
+  });
+
+  app.post("/api/auth/logout", async (req, res) => {
+    req.session.destroy((err) => {
+      if (err) {
+        console.error('Session destroy error:', err);
+        return res.status(500).json({ error: "Logout failed" });
+      }
+      res.json({ success: true });
+    });
+  });
+
+  app.get("/api/auth/status", async (req, res) => {
+    res.json({ 
+      isAdmin: req.session?.isAdmin || false,
+      requiresAuth: !!process.env.ADMIN_KEY 
+    });
+  });
+
   // Dashboard stats
   app.get("/api/dashboard/stats", adminAuth, async (req, res) => {
     try {
@@ -291,6 +363,111 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.json(data);
     } catch (error) {
       res.status(500).json({ error: "Failed to fetch analytics data" });
+    }
+  });
+
+  // Export
+  app.get("/api/export/season/:seasonId", adminAuth, async (req, res) => {
+    try {
+      const seasonId = parseInt(req.params.seasonId);
+      if (isNaN(seasonId)) {
+        return res.status(400).json({ error: "Invalid season ID" });
+      }
+
+      const buffer = await exportService.exportSeasonSummary(seasonId);
+      const season = await storage.getSeason(seasonId);
+      const filename = `season_${season?.name || seasonId}_summary.xlsx`;
+
+      res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+      res.setHeader('Content-Disposition', `attachment; filename="${encodeURIComponent(filename)}"`);
+      res.send(buffer);
+    } catch (error) {
+      console.error('Export season error:', error);
+      res.status(500).json({ error: "Failed to export season summary" });
+    }
+  });
+
+  app.get("/api/export/leaderboard/:seasonId/:role", adminAuth, async (req, res) => {
+    try {
+      const seasonId = parseInt(req.params.seasonId);
+      const role = req.params.role;
+
+      if (isNaN(seasonId)) {
+        return res.status(400).json({ error: "Invalid season ID" });
+      }
+
+      if (!['sotnik', 'driver'].includes(role)) {
+        return res.status(400).json({ error: "Invalid role - must be 'sotnik' or 'driver'" });
+      }
+
+      const buffer = await exportService.exportLeaderboard(seasonId, role);
+      const season = await storage.getSeason(seasonId);
+      const roleLabel = role === 'sotnik' ? 'centurions' : 'drivers';
+      const filename = `leaderboard_${roleLabel}_${season?.name || seasonId}.xlsx`;
+
+      res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+      res.setHeader('Content-Disposition', `attachment; filename="${encodeURIComponent(filename)}"`);
+      res.send(buffer);
+    } catch (error) {
+      console.error('Export leaderboard error:', error);
+      res.status(500).json({ error: "Failed to export leaderboard" });
+    }
+  });
+
+  app.get("/api/export/daily/:seasonId/:date", adminAuth, async (req, res) => {
+    try {
+      const seasonId = parseInt(req.params.seasonId);
+      const date = req.params.date;
+
+      if (isNaN(seasonId)) {
+        return res.status(400).json({ error: "Invalid season ID" });
+      }
+
+      const buffer = await exportService.exportDailyReport(seasonId, date);
+      const filename = `daily_report_${date}.xlsx`;
+
+      res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+      res.setHeader('Content-Disposition', `attachment; filename="${encodeURIComponent(filename)}"`);
+      res.send(buffer);
+    } catch (error) {
+      console.error('Export daily report error:', error);
+      res.status(500).json({ error: "Failed to export daily report" });
+    }
+  });
+
+  app.get("/api/export/fraud-alerts", adminAuth, async (req, res) => {
+    try {
+      const buffer = await exportService.exportFraudAlerts();
+      const filename = `fraud_alerts_${new Date().toISOString().split('T')[0]}.xlsx`;
+
+      res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+      res.setHeader('Content-Disposition', `attachment; filename="${encodeURIComponent(filename)}"`);
+      res.send(buffer);
+    } catch (error) {
+      console.error('Export fraud alerts error:', error);
+      res.status(500).json({ error: "Failed to export fraud alerts" });
+    }
+  });
+
+  app.get("/api/export/user/:userId/season/:seasonId", adminAuth, async (req, res) => {
+    try {
+      const userId = parseInt(req.params.userId);
+      const seasonId = parseInt(req.params.seasonId);
+
+      if (isNaN(userId) || isNaN(seasonId)) {
+        return res.status(400).json({ error: "Invalid user ID or season ID" });
+      }
+
+      const buffer = await exportService.exportUserPerformance(userId, seasonId);
+      const user = await storage.getUser(userId);
+      const filename = `user_${user?.phone || userId}_performance.xlsx`;
+
+      res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+      res.setHeader('Content-Disposition', `attachment; filename="${encodeURIComponent(filename)}"`);
+      res.send(buffer);
+    } catch (error) {
+      console.error('Export user performance error:', error);
+      res.status(500).json({ error: "Failed to export user performance" });
     }
   });
 

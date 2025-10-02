@@ -1,13 +1,55 @@
+import { useState } from "react";
 import { useActiveSeason } from "@/hooks/use-seasons";
 import { useTopCenturions, useTopDrivers } from "@/hooks/use-leaderboards";
 import { Header } from "@/components/layout/header";
 import { LeaderboardCard } from "@/components/dashboard/leaderboard-card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Button } from "@/components/ui/button";
+import { Download } from "lucide-react";
+import { useToast } from "@/hooks/use-toast";
 
 export default function Leaderboards() {
   const { data: activeSeason } = useActiveSeason();
   const { data: topCenturions, isLoading: loadingCenturions } = useTopCenturions(activeSeason?.id || 0, 50);
   const { data: topDrivers, isLoading: loadingDrivers } = useTopDrivers(activeSeason?.id || 0, 50);
+  const [exporting, setExporting] = useState<string | null>(null);
+  const { toast } = useToast();
+
+  const handleExportLeaderboard = async (role: 'sotnik' | 'driver') => {
+    if (!activeSeason) return;
+
+    setExporting(role);
+    try {
+      const response = await fetch(`/api/export/leaderboard/${activeSeason.id}/${role}`, {
+        credentials: 'include'
+      });
+      if (!response.ok) throw new Error('Export failed');
+      
+      const blob = await response.blob();
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      const roleLabel = role === 'sotnik' ? 'сотников' : 'водителей';
+      a.download = `leaderboard_${roleLabel}_${activeSeason.name}.xlsx`;
+      document.body.appendChild(a);
+      a.click();
+      window.URL.revokeObjectURL(url);
+      document.body.removeChild(a);
+      
+      toast({
+        title: "Рейтинг экспортирован",
+        description: `Рейтинг ${roleLabel} успешно скачан`,
+      });
+    } catch (error) {
+      toast({
+        title: "Ошибка",
+        description: "Не удалось экспортировать рейтинг",
+        variant: "destructive",
+      });
+    } finally {
+      setExporting(null);
+    }
+  };
 
   if (!activeSeason) {
     return (
@@ -42,6 +84,18 @@ export default function Leaderboards() {
             </TabsList>
 
             <TabsContent value="centurions" className="space-y-6">
+              <div className="flex justify-between items-center mb-4">
+                <h2 className="text-xl font-semibold">Рейтинг Сотников</h2>
+                <Button 
+                  variant="outline" 
+                  onClick={() => handleExportLeaderboard('sotnik')}
+                  disabled={exporting === 'sotnik'}
+                  data-testid="export-centurions"
+                >
+                  <Download className="h-4 w-4 mr-2" />
+                  {exporting === 'sotnik' ? 'Экспорт...' : 'Экспортировать XLSX'}
+                </Button>
+              </div>
               <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
                 <LeaderboardCard
                   title="Рейтинг Сотников"
@@ -89,6 +143,18 @@ export default function Leaderboards() {
             </TabsContent>
 
             <TabsContent value="drivers" className="space-y-6">
+              <div className="flex justify-between items-center mb-4">
+                <h2 className="text-xl font-semibold">Рейтинг Водителей</h2>
+                <Button 
+                  variant="outline" 
+                  onClick={() => handleExportLeaderboard('driver')}
+                  disabled={exporting === 'driver'}
+                  data-testid="export-drivers"
+                >
+                  <Download className="h-4 w-4 mr-2" />
+                  {exporting === 'driver' ? 'Экспорт...' : 'Экспортировать XLSX'}
+                </Button>
+              </div>
               <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
                 <LeaderboardCard
                   title="Рейтинг Водителей"

@@ -36,6 +36,14 @@ Preferred communication style: Simple, everyday language.
   - Admin UI: /notifications page showing notification history with status badges
   - **Remaining work**: Event triggers not integrated into calculations/role-transitions, frontend WebSocket client missing, user preference defaults needed
 
+- Implemented comprehensive data export functionality
+  - Export Service: XLSX generation for season summaries, leaderboards, daily reports, fraud alerts, user performance
+  - All exports with automatic column sizing, proper formatting, Russian localization
+  - API endpoints: /api/export/season/:seasonId, /api/export/leaderboard/:seasonId/:role, /api/export/daily/:seasonId/:date, /api/export/fraud-alerts, /api/export/user/:userId/season/:seasonId
+  - Session-based admin authentication: POST /api/auth/login, POST /api/auth/logout, GET /api/auth/status
+  - Frontend: Export buttons on Reports, Leaderboards, Fraud pages with toast notifications
+  - Security: ADMIN_KEY stays on server, session cookies for authentication, auto-login in development
+
 # System Architecture
 
 ## Technology Stack

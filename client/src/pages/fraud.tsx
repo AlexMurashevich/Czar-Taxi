@@ -6,13 +6,47 @@ import { AlertCard } from "@/components/fraud/alert-card";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
-import { AlertTriangle, Shield, Clock, TrendingUp, Settings } from "lucide-react";
+import { AlertTriangle, Shield, Clock, TrendingUp, Settings, Download } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 
 export default function Fraud() {
   const { data: alerts, isLoading } = useFraudAlerts();
   const blockUser = useBlockUser();
   const { toast } = useToast();
+  const [exporting, setExporting] = useState(false);
+
+  const handleExportAlerts = async () => {
+    setExporting(true);
+    try {
+      const response = await fetch('/api/export/fraud-alerts', {
+        credentials: 'include'
+      });
+      if (!response.ok) throw new Error('Export failed');
+      
+      const blob = await response.blob();
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `fraud_alerts_${new Date().toISOString().split('T')[0]}.xlsx`;
+      document.body.appendChild(a);
+      a.click();
+      window.URL.revokeObjectURL(url);
+      document.body.removeChild(a);
+      
+      toast({
+        title: "Алерты экспортированы",
+        description: "Отчет по аномалиям успешно скачан",
+      });
+    } catch (error) {
+      toast({
+        title: "Ошибка",
+        description: "Не удалось экспортировать алерты",
+        variant: "destructive",
+      });
+    } finally {
+      setExporting(false);
+    }
+  };
 
   const handleInvestigate = (alertId: string) => {
     console.log('Investigate alert:', alertId);
@@ -86,6 +120,19 @@ export default function Fraud() {
 
       <main className="p-8">
         <div className="max-w-6xl mx-auto space-y-8">
+          {/* Export Button */}
+          <div className="flex justify-end">
+            <Button 
+              variant="outline" 
+              onClick={handleExportAlerts}
+              disabled={exporting}
+              data-testid="export-fraud-alerts"
+            >
+              <Download className="h-4 w-4 mr-2" />
+              {exporting ? 'Экспорт...' : 'Экспортировать алерты'}
+            </Button>
+          </div>
+
           {/* Fraud Stats Overview */}
           <div className="grid grid-cols-1 md:grid-cols-5 gap-6">
             <div className="bg-card rounded-lg border border-border p-6">
