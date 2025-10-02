@@ -13,6 +13,7 @@ import Participants from "@/pages/participants";
 import Fraud from "@/pages/fraud";
 import Reports from "@/pages/reports";
 import Analytics from "@/pages/analytics";
+import Notifications from "@/pages/notifications";
 import NotFound from "@/pages/not-found";
 
 function Router() {
@@ -30,6 +31,7 @@ function Router() {
           <Route path="/fraud" component={Fraud} />
           <Route path="/reports" component={Reports} />
           <Route path="/analytics" component={Analytics} />
+          <Route path="/notifications" component={Notifications} />
           <Route component={NotFound} />
         </Switch>
       </div>

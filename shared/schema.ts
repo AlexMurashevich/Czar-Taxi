@@ -119,6 +119,33 @@ export const auditLogs = pgTable("audit_logs", {
   createdAt: timestamp("created_at").notNull().defaultNow(),
 });
 
+export const notifications = pgTable("notifications", {
+  id: bigserial("id", { mode: "number" }).primaryKey(),
+  userId: bigint("user_id", { mode: "number" }).notNull().references(() => users.id, { onDelete: "cascade" }),
+  type: varchar("type", { length: 30 }).notNull(), // role_change, goal_achieved, ranking_update, manual, system
+  title: varchar("title", { length: 255 }).notNull(),
+  message: text("message").notNull(),
+  deliveryMethod: varchar("delivery_method", { length: 30 }).notNull(), // telegram, websocket, both
+  status: varchar("status", { length: 20 }).notNull().default("pending"), // pending, sent, failed
+  sentAt: timestamp("sent_at"),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+}, (table) => ({
+  userIdx: index("idx_notifications_user").on(table.userId),
+  statusIdx: index("idx_notifications_status").on(table.status),
+  typeIdx: index("idx_notifications_type").on(table.type),
+}));
+
+export const notificationPreferences = pgTable("notification_preferences", {
+  id: bigserial("id", { mode: "number" }).primaryKey(),
+  userId: bigint("user_id", { mode: "number" }).notNull().references(() => users.id, { onDelete: "cascade" }),
+  eventType: varchar("event_type", { length: 50 }).notNull(), // role_change, goal_achieved, ranking_update, daily_summary
+  enabled: boolean("enabled").notNull().default(true),
+  telegramEnabled: boolean("telegram_enabled").notNull().default(true),
+  websocketEnabled: boolean("websocket_enabled").notNull().default(true),
+}, (table) => ({
+  uniqueUserEvent: unique().on(table.userId, table.eventType),
+}));
+
 // Relations
 export const usersRelations = relations(users, ({ many }) => ({
   roleAssignments: many(roleAssignments),
@@ -165,6 +192,16 @@ export const insertImportSchema = createInsertSchema(imports).omit({
   uploadedAt: true,
 });
 
+export const insertNotificationSchema = createInsertSchema(notifications).omit({
+  id: true,
+  createdAt: true,
+  sentAt: true,
+});
+
+export const insertNotificationPreferenceSchema = createInsertSchema(notificationPreferences).omit({
+  id: true,
+});
+
 // Types
 export type User = typeof users.$inferSelect;
 export type InsertUser = z.infer<typeof insertUserSchema>;
@@ -181,3 +218,7 @@ export type InsertImport = z.infer<typeof insertImportSchema>;
 export type Waitlist = typeof waitlist.$inferSelect;
 export type MessagingPermission = typeof messagingPermissions.$inferSelect;
 export type AuditLog = typeof auditLogs.$inferSelect;
+export type Notification = typeof notifications.$inferSelect;
+export type InsertNotification = z.infer<typeof insertNotificationSchema>;
+export type NotificationPreference = typeof notificationPreferences.$inferSelect;
+export type InsertNotificationPreference = z.infer<typeof insertNotificationPreferenceSchema>;

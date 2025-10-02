@@ -27,6 +27,15 @@ Preferred communication style: Simple, everyday language.
   - Backend analytics service calculating all metrics from aggregates_daily and aggregates_season tables
   - API endpoint: GET /api/analytics/:seasonId
 
+- Built notification infrastructure foundation (partial implementation)
+  - Database: notifications and notification_preferences tables with full schema
+  - Storage: Complete CRUD operations for notifications and preferences
+  - NotificationService: Core service with sendNotification, trigger methods (role changes, goals, rankings)
+  - WebSocket server: Basic WebSocket server on /ws path for real-time messaging
+  - API routes: GET/POST endpoints for notification management and manual sending
+  - Admin UI: /notifications page showing notification history with status badges
+  - **Remaining work**: Event triggers not integrated into calculations/role-transitions, frontend WebSocket client missing, user preference defaults needed
+
 # System Architecture
 
 ## Technology Stack

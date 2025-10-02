@@ -9,6 +9,7 @@ import { roleTransitions } from "./services/role-transitions";
 import { antiFraud } from "./services/anti-fraud";
 import { telegramBot } from "./services/telegram-bot";
 import { analyticsService } from "./services/analytics";
+import { setupWebSocket } from "./websocket";
 import multer from "multer";
 
 const upload = multer({ dest: 'uploads/' });
@@ -293,6 +294,73 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Notifications
+  app.get("/api/notifications", adminAuth, async (req, res) => {
+    try {
+      const { userId, type, status, limit } = req.query;
+      const filters: any = {};
+      if (userId) filters.userId = parseInt(userId as string);
+      if (type) filters.type = type as string;
+      if (status) filters.status = status as string;
+      if (limit) filters.limit = parseInt(limit as string);
+      
+      const notifications = await storage.getNotifications(filters);
+      res.json(notifications);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to fetch notifications" });
+    }
+  });
+
+  app.get("/api/notifications/preferences/:userId", adminAuth, async (req, res) => {
+    try {
+      const userId = parseInt(req.params.userId);
+      if (isNaN(userId)) {
+        return res.status(400).json({ error: "Invalid user ID" });
+      }
+      const preferences = await storage.getNotificationPreferences(userId);
+      res.json(preferences);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to fetch notification preferences" });
+    }
+  });
+
+  app.put("/api/notifications/preferences/:id", adminAuth, async (req, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      if (isNaN(id)) {
+        return res.status(400).json({ error: "Invalid preference ID" });
+      }
+      const updated = await storage.updateNotificationPreference(id, req.body);
+      res.json(updated);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to update notification preference" });
+    }
+  });
+
+  app.post("/api/notifications/send", adminAuth, async (req, res) => {
+    try {
+      const { userId, type, title, message, deliveryMethod } = req.body;
+      
+      if (!userId || !type || !title || !message) {
+        return res.status(400).json({ error: "Missing required fields" });
+      }
+
+      const { notificationService } = await import("./services/notifications");
+      await notificationService.sendNotification({
+        userId: parseInt(userId),
+        type,
+        title,
+        message,
+        deliveryMethod: deliveryMethod || 'both',
+      });
+
+      res.json({ success: true });
+    } catch (error) {
+      console.error('Failed to send notification:', error);
+      res.status(500).json({ error: "Failed to send notification" });
+    }
+  });
+
   // Recalculations
   app.post("/api/recalculate", adminAuth, async (req, res) => {
     try {
@@ -353,6 +421,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   const httpServer = createServer(app);
+  setupWebSocket(httpServer);
   return httpServer;
 }
 

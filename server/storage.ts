@@ -1,10 +1,11 @@
 import { 
   users, seasons, roleAssignments, hoursRaw, aggregatesDaily, aggregatesSeason, 
-  imports, waitlist, messagingPermissions, auditLogs,
+  imports, waitlist, messagingPermissions, auditLogs, notifications, notificationPreferences,
   type User, type InsertUser, type Season, type InsertSeason, 
   type RoleAssignment, type InsertRoleAssignment, type HoursRaw, type InsertHoursRaw,
   type AggregateDaily, type AggregateSeason, type Import, type InsertImport,
-  type Waitlist, type MessagingPermission, type AuditLog
+  type Waitlist, type MessagingPermission, type AuditLog,
+  type Notification, type InsertNotification, type NotificationPreference, type InsertNotificationPreference
 } from "@shared/schema";
 import { db } from "./db";
 import { eq, and, desc, asc, gte, lte, sum, count, sql } from "drizzle-orm";
@@ -75,6 +76,17 @@ export interface IStorage {
 
   // Audit
   createAuditLog(log: Omit<AuditLog, 'id' | 'createdAt'>): Promise<AuditLog>;
+
+  // Notifications
+  createNotification(notification: InsertNotification): Promise<Notification>;
+  getNotifications(filters?: { userId?: number; type?: string; status?: string; limit?: number }): Promise<Notification[]>;
+  updateNotificationStatus(id: number, status: string, sentAt?: Date): Promise<Notification>;
+  
+  // Notification Preferences
+  createNotificationPreference(preference: InsertNotificationPreference): Promise<NotificationPreference>;
+  getNotificationPreferences(userId: number): Promise<NotificationPreference[]>;
+  updateNotificationPreference(id: number, updates: Partial<InsertNotificationPreference>): Promise<NotificationPreference>;
+  upsertNotificationPreference(preference: InsertNotificationPreference): Promise<NotificationPreference>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -363,6 +375,77 @@ export class DatabaseStorage implements IStorage {
       .from(waitlist)
       .where(eq(waitlist.status, 'new'));
     return result.count;
+  }
+
+  async createNotification(notification: InsertNotification): Promise<Notification> {
+    const [created] = await db.insert(notifications).values(notification).returning();
+    return created;
+  }
+
+  async getNotifications(filters?: { userId?: number; type?: string; status?: string; limit?: number }): Promise<Notification[]> {
+    let query = db.select().from(notifications);
+    
+    const conditions = [];
+    if (filters?.userId) {
+      conditions.push(eq(notifications.userId, filters.userId));
+    }
+    if (filters?.type) {
+      conditions.push(eq(notifications.type, filters.type));
+    }
+    if (filters?.status) {
+      conditions.push(eq(notifications.status, filters.status));
+    }
+
+    if (conditions.length > 0) {
+      query = query.where(and(...conditions)) as any;
+    }
+
+    let result = query.orderBy(desc(notifications.createdAt)) as any;
+    
+    if (filters?.limit) {
+      result = result.limit(filters.limit);
+    }
+
+    return await result;
+  }
+
+  async updateNotificationStatus(id: number, status: string, sentAt?: Date): Promise<Notification> {
+    const updates: any = { status };
+    if (sentAt) {
+      updates.sentAt = sentAt;
+    }
+    const [updated] = await db.update(notifications).set(updates).where(eq(notifications.id, id)).returning();
+    return updated;
+  }
+
+  async createNotificationPreference(preference: InsertNotificationPreference): Promise<NotificationPreference> {
+    const [created] = await db.insert(notificationPreferences).values(preference).returning();
+    return created;
+  }
+
+  async getNotificationPreferences(userId: number): Promise<NotificationPreference[]> {
+    return await db.select().from(notificationPreferences).where(eq(notificationPreferences.userId, userId));
+  }
+
+  async updateNotificationPreference(id: number, updates: Partial<InsertNotificationPreference>): Promise<NotificationPreference> {
+    const [updated] = await db.update(notificationPreferences).set(updates).where(eq(notificationPreferences.id, id)).returning();
+    return updated;
+  }
+
+  async upsertNotificationPreference(preference: InsertNotificationPreference): Promise<NotificationPreference> {
+    const [result] = await db
+      .insert(notificationPreferences)
+      .values(preference)
+      .onConflictDoUpdate({
+        target: [notificationPreferences.userId, notificationPreferences.eventType],
+        set: {
+          enabled: preference.enabled,
+          telegramEnabled: preference.telegramEnabled,
+          websocketEnabled: preference.websocketEnabled,
+        },
+      })
+      .returning();
+    return result;
   }
 }
 

@@ -1,6 +1,6 @@
 import { Link, useLocation } from "wouter";
 import { cn } from "@/lib/utils";
-import { Car, BarChart3, Calendar, Upload, Users, TreePine, Trophy, Shield, FileText, Settings, MessageCircle } from "lucide-react";
+import { Car, BarChart3, Calendar, Upload, Users, TreePine, Trophy, Shield, FileText, Settings, MessageCircle, Bell } from "lucide-react";
 
 const navigation = [
   { name: "Обзор", href: "/", icon: BarChart3 },
@@ -12,6 +12,7 @@ const navigation = [
   { name: "Антифрод", href: "/fraud", icon: Shield, badge: 3 },
   { name: "Отчёты", href: "/reports", icon: FileText },
   { name: "Аналитика", href: "/analytics", icon: BarChart3 },
+  { name: "Уведомления", href: "/notifications", icon: Bell },
 ];
 
 const settings = [
