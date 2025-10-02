@@ -12,6 +12,7 @@ import Leaderboards from "@/pages/leaderboards";
 import Participants from "@/pages/participants";
 import Fraud from "@/pages/fraud";
 import Reports from "@/pages/reports";
+import Analytics from "@/pages/analytics";
 import NotFound from "@/pages/not-found";
 
 function Router() {
@@ -28,6 +29,7 @@ function Router() {
           <Route path="/participants" component={Participants} />
           <Route path="/fraud" component={Fraud} />
           <Route path="/reports" component={Reports} />
+          <Route path="/analytics" component={Analytics} />
           <Route component={NotFound} />
         </Switch>
       </div>

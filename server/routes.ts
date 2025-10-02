@@ -8,6 +8,7 @@ import { calculations } from "./services/calculations";
 import { roleTransitions } from "./services/role-transitions";
 import { antiFraud } from "./services/anti-fraud";
 import { telegramBot } from "./services/telegram-bot";
+import { analyticsService } from "./services/analytics";
 import multer from "multer";
 
 const upload = multer({ dest: 'uploads/' });
@@ -275,6 +276,20 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.json(alerts);
     } catch (error) {
       res.status(500).json({ error: "Failed to fetch fraud alerts" });
+    }
+  });
+
+  // Analytics
+  app.get("/api/analytics/:seasonId", adminAuth, async (req, res) => {
+    try {
+      const seasonId = parseInt(req.params.seasonId);
+      if (isNaN(seasonId) || seasonId <= 0) {
+        return res.status(400).json({ error: "Invalid season ID - must be a positive integer" });
+      }
+      const data = await analyticsService.getAnalytics(seasonId);
+      res.json(data);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to fetch analytics data" });
     }
   });
 

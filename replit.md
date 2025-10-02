@@ -8,6 +8,25 @@ The application tracks driver work hours, calculates team performance, manages s
 
 Preferred communication style: Simple, everyday language.
 
+# Recent Changes
+
+**October 2, 2025:**
+- Fixed hardcoded dashboard statistics: all values now come from real database queries
+  - Removed hardcoded decurions count (87), waitlist count (12), alerts count (3)
+  - Added getHierarchyStats() and getWaitlistCount() storage methods
+  - Dashboard alerts now use antiFraud.getActiveAlerts() for real-time fraud detection
+  - Added API endpoints: /api/dashboard/hierarchy-stats/:seasonId, /api/dashboard/waitlist-count
+  
+- Added comprehensive analytics dashboard with charts
+  - New /analytics page with 4 chart visualizations (LineChart, BarChart, AreaChart)
+  - Daily trends tracking personal and total hours over time
+  - Team comparison showing performance by sotnik groups  
+  - Goal progress with cumulative achievement tracking
+  - Performance distribution histogram by target percentage ranges
+  - Overview stats: average daily growth, active today count, achieved goal count, days remaining
+  - Backend analytics service calculating all metrics from aggregates_daily and aggregates_season tables
+  - API endpoint: GET /api/analytics/:seasonId
+
 # System Architecture
 
 ## Technology Stack

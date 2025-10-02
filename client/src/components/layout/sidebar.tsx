@@ -11,6 +11,7 @@ const navigation = [
   { name: "Участники", href: "/participants", icon: Users },
   { name: "Антифрод", href: "/fraud", icon: Shield, badge: 3 },
   { name: "Отчёты", href: "/reports", icon: FileText },
+  { name: "Аналитика", href: "/analytics", icon: BarChart3 },
 ];
 
 const settings = [
