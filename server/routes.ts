@@ -30,10 +30,33 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Dashboard stats
   app.get("/api/dashboard/stats", adminAuth, async (req, res) => {
     try {
-      const stats = await storage.getDashboardStats();
+      const fraudAlerts = await antiFraud.getActiveAlerts();
+      const stats = await storage.getDashboardStats(fraudAlerts.length);
       res.json(stats);
     } catch (error) {
       res.status(500).json({ error: "Failed to fetch dashboard stats" });
+    }
+  });
+
+  app.get("/api/dashboard/hierarchy-stats/:seasonId", adminAuth, async (req, res) => {
+    try {
+      const seasonId = parseInt(req.params.seasonId);
+      if (isNaN(seasonId) || seasonId <= 0) {
+        return res.status(400).json({ error: "Invalid season ID - must be a positive integer" });
+      }
+      const stats = await storage.getHierarchyStats(seasonId);
+      res.json(stats);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to fetch hierarchy stats" });
+    }
+  });
+
+  app.get("/api/dashboard/waitlist-count", adminAuth, async (req, res) => {
+    try {
+      const count = await storage.getWaitlistCount();
+      res.json({ count });
+    } catch (error) {
+      res.status(500).json({ error: "Failed to fetch waitlist count" });
     }
   });
 

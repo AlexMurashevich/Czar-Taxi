@@ -1,4 +1,4 @@
-import { useDashboardStats } from "@/hooks/use-dashboard-stats";
+import { useDashboardStats, useHierarchyStats, useWaitlistCount } from "@/hooks/use-dashboard-stats";
 import { useActiveSeason } from "@/hooks/use-seasons";
 import { useTopCenturions, useTopDrivers } from "@/hooks/use-leaderboards";
 import { useFraudAlerts } from "@/hooks/use-fraud-alerts";
@@ -18,6 +18,8 @@ export default function Dashboard() {
   const [, setLocation] = useLocation();
   const { data: stats, refetch: refetchStats } = useDashboardStats();
   const { data: activeSeason } = useActiveSeason();
+  const { data: hierarchyStats } = useHierarchyStats(activeSeason?.id);
+  const { data: waitlistData } = useWaitlistCount();
   const { data: topCenturions } = useTopCenturions(activeSeason?.id || 0, 5);
   const { data: topDrivers } = useTopDrivers(activeSeason?.id || 0, 5);
   const { data: fraudAlerts } = useFraudAlerts();
@@ -28,16 +30,16 @@ export default function Dashboard() {
     refetchStats();
   };
 
-  const hierarchyStats = {
-    tsar: { current: 1, max: 1 },
-    centurions: { current: topCenturions?.length || 0, max: 10 },
-    decurions: { current: 87, max: 100 }, // Mock data
-    drivers: { current: stats?.totalParticipants ? stats.totalParticipants - 88 : 0, max: 1000 }
-  };
-
   const currentDay = activeSeason ? 
     Math.ceil((new Date().getTime() - new Date(activeSeason.startDate).getTime()) / (1000 * 60 * 60 * 24)) : 0;
   const seasonProgress = activeSeason ? (currentDay / activeSeason.daysCount) * 100 : 0;
+
+  const defaultHierarchyStats = {
+    tsar: { current: 0, max: 1 },
+    centurions: { current: 0, max: 10 },
+    decurions: { current: 0, max: 100 },
+    drivers: { current: 0, max: 1000 }
+  };
 
   return (
     <div className="min-h-screen bg-background">
@@ -58,7 +60,7 @@ export default function Dashboard() {
             description="Участников"
             icon={Users}
             iconColor="bg-primary/10 text-primary"
-            trend={{ value: "+23 в этом месяце", positive: true }}
+            data-testid="stat-total-participants"
           />
           <StatCard
             title="Сегодня"
@@ -66,7 +68,7 @@ export default function Dashboard() {
             description="Часов наработано"
             icon={Clock}
             iconColor="bg-accent/10 text-accent"
-            trend={{ value: "103% от цели", positive: true }}
+            data-testid="stat-daily-hours"
           />
           <StatCard
             title="Прогресс"
@@ -92,7 +94,7 @@ export default function Dashboard() {
               <SeasonCard
                 season={activeSeason}
                 progress={seasonProgress}
-                hierarchyStats={hierarchyStats}
+                hierarchyStats={hierarchyStats || defaultHierarchyStats}
                 onExport={() => console.log('Export season report')}
                 onFinish={() => console.log('Finish season')}
               />
@@ -110,7 +112,7 @@ export default function Dashboard() {
               onNewApplications={() => setLocation('/participants')}
               onRotateGroups={() => console.log('Rotate groups')}
               onNotifications={() => console.log('Send notifications')}
-              newApplicationsCount={12}
+              newApplicationsCount={waitlistData?.count || 0}
             />
 
             <FraudAlerts

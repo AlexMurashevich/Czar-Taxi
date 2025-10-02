@@ -53,12 +53,21 @@ export interface IStorage {
   getWaitlist(): Promise<Waitlist[]>;
 
   // Dashboard Stats
-  getDashboardStats(): Promise<{
+  getDashboardStats(alertsCount?: number): Promise<{
     totalParticipants: number;
     dailyHours: number;
     goalPercentage: number;
     alerts: number;
   }>;
+  
+  getHierarchyStats(seasonId: number): Promise<{
+    tsar: { current: number; max: number };
+    centurions: { current: number; max: number };
+    decurions: { current: number; max: number };
+    drivers: { current: number; max: number };
+  }>;
+  
+  getWaitlistCount(): Promise<number>;
 
   // Leaderboards
   getTopCenturions(seasonId: number, limit?: number): Promise<Array<AggregateSeason & { user: User }>>;
@@ -209,7 +218,7 @@ export class DatabaseStorage implements IStorage {
     return await db.select().from(waitlist).orderBy(desc(waitlist.addedAt));
   }
 
-  async getDashboardStats(): Promise<{
+  async getDashboardStats(alertsCount?: number): Promise<{
     totalParticipants: number;
     dailyHours: number;
     goalPercentage: number;
@@ -240,14 +249,11 @@ export class DatabaseStorage implements IStorage {
       ? Math.round((Number(seasonProgress.totalHours || 0) / Number(seasonProgress.totalTarget)) * 100)
       : 0;
 
-    // Mock alerts count for now - would be calculated from anti-fraud system
-    const alerts = 3;
-
     return {
       totalParticipants: participantsResult.count,
       dailyHours: Math.round(Number(todayHoursResult.total || 0)),
       goalPercentage,
-      alerts
+      alerts: alertsCount ?? 0
     };
   }
 
@@ -308,6 +314,55 @@ export class DatabaseStorage implements IStorage {
   async createAuditLog(log: Omit<AuditLog, 'id' | 'createdAt'>): Promise<AuditLog> {
     const [auditRecord] = await db.insert(auditLogs).values(log).returning();
     return auditRecord;
+  }
+
+  async getHierarchyStats(seasonId: number): Promise<{
+    tsar: { current: number; max: number };
+    centurions: { current: number; max: number };
+    decurions: { current: number; max: number };
+    drivers: { current: number; max: number };
+  }> {
+    const [tsarCount] = await db.select({ count: count() })
+      .from(roleAssignments)
+      .where(and(
+        eq(roleAssignments.seasonId, seasonId),
+        eq(roleAssignments.role, 'tsar')
+      ));
+
+    const [centurionCount] = await db.select({ count: count() })
+      .from(roleAssignments)
+      .where(and(
+        eq(roleAssignments.seasonId, seasonId),
+        eq(roleAssignments.role, 'sotnik')
+      ));
+
+    const [decurionCount] = await db.select({ count: count() })
+      .from(roleAssignments)
+      .where(and(
+        eq(roleAssignments.seasonId, seasonId),
+        eq(roleAssignments.role, 'desyatnik')
+      ));
+
+    const [driverCount] = await db.select({ count: count() })
+      .from(roleAssignments)
+      .where(and(
+        eq(roleAssignments.seasonId, seasonId),
+        eq(roleAssignments.role, 'driver')
+      ));
+
+    return {
+      tsar: { current: tsarCount.count, max: 1 },
+      centurions: { current: centurionCount.count, max: 10 },
+      decurions: { current: decurionCount.count, max: 100 },
+      drivers: { current: driverCount.count, max: 1000 }
+    };
+  }
+
+  async getWaitlistCount(): Promise<number> {
+    const [result] = await db.select({ count: count() })
+      .from(waitlist)
+      .where(eq(waitlist.status, 'new'));
+    return result.count;
   }
 }
 
